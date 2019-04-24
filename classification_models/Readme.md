@@ -5,4 +5,4 @@
 - Linear Discriminant Analysis
 - Quadratic Discriminant Analysis 
 
-
+The results can be seen in test_classification_models.ipynb
