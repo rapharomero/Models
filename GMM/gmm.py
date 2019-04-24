@@ -1,3 +1,5 @@
+import numpy as np
+
 # Definition of the gaussian density function with non isotropic covariance matrix
 def gaussian(X, mu, sigma):
     """
@@ -36,40 +38,19 @@ def random_uniform(X, k):
     return C0
 
 
-def tauNonIso(i,j,pi,mu,sigma):
-    """
-    Computes the weight
-    Parameters
-    ----------
-    i : index of observation
-    j : index of  class
-    pi : distribution of z
-    mu : means of the distributions of x given z
-    sigma : covariance matrices of the distributions of x given z
-
-    Returns
-    -------
-    Value of the weight of th
-    """
-    K = np.shape(pi)[0] # Number of classes
-    num = pi[j] * gaussNonIso(X[i], mu[j], sigma[j])
-    denom = np.sum([pi[j]*gaussNonIso(X[i],mu[j],sigma[j]) for j in range(K)])
-    return num/denom
-
-
 class GMM(object):
     """
     Class for Gaussian mixture model.
     """
 
     def __int__(self):
-        self.n_classes = K
         self.means = None
         self.sigmas = None
         self.weights = None
         self.log_likelihoods = None
 
-    def log_likelihood(X, tau, pi, means, sigmas):
+
+    def log_likelihood(self, X, tau, pi, means, sigmas):
         """
         Log-likelihood of the GMM
         """
@@ -80,12 +61,11 @@ class GMM(object):
         inverses = np.linalg.pinv(sigmas)
         dets = np.linalg.det(sigmas)
 
-        const = np.log(2 * np.pi * dets) ** (p / 2)
-        terms = tau * np.log(pi) - const - np.einsum('ik,kji->ik',
-                                                      np.einsum('ik,kip -> ik',
-                                                                tau,
-                                                                np.stack(X-mu for mu in means)),
-                                                      np.stack(np.dot(sinv, (X - mean).T) for mean, sinv in zip(means, inverses)))
+        const = - np.log(2 * np.pi) ** (p / 2)
+
+        terms = tau * (np.log(pi) - p * np.log(dets) + const) - np.einsum('ik,kip -> ik',
+                                                                        tau,
+                    np.stack(np.dot(X - mu, np.dot(sinv, (X - mu).T)) for mu, sinv in zip(means, inverses)))
 
         return np.sum(np.sum(terms))
 
@@ -105,14 +85,14 @@ class GMM(object):
         Performs the M step
         """
         pi = np.mean(tau, axis = 0)
-        means = np.einsum('k,kp->kp', np.sum(tau, axis=0), np.dot(tau.T, X))
+        means = np.einsum('k,kp->kp', 1.0 / np.sum(tau, axis=0), np.dot(tau.T, X))
         sigmas = np.einsum('k,klm->klm',
                            1.0 / np.sum(tau, axis=0),
                            np.stack([np.dot(np.einsum('i,ik->ik', tau[:, j], X - mu).T, X - mu) for j,mu in enumerate(means)]))
 
         return pi, means, sigmas
 
-    def fit(self, X, K=5, initialize_f=random_select, Niter=100):
+    def fit(self, X, K=5, initialize_f=random_select, Niter=100, C0=None):
         """
         Trains the GMM sing the Expectation-Maximization algorithm.
 
@@ -128,9 +108,11 @@ class GMM(object):
             sigma : Array containing the standard deviations of each class
         """
         n, p = X.shape
-        self.n_classes=K
-
-        if initialize_f is None:
+        if C0 is not None:
+            pi = np.random.rand(K)
+            pi /= np.sum(pi)
+            means = C0 # Initialize with set of means
+        elif initialize_f is None:
         # Default: Random initialization
             pi = np.random.rand(K)
             pi /= np.sum(pi)
@@ -148,24 +130,25 @@ class GMM(object):
         # EM Loop
         log_likelihoods = []
         labels = range(K)
-        for t in range(Niter):
+        for t in tqdm(range(Niter)):
             # E-step
             tau = self.E_step(X, pi, means, sigmas)
             # M-step
             pi, means, sigmas = self.M_step(X, tau)
             # Log Likelihood
-            #log_likelihoods += self.log_likelihood(X, tau, pi, means, sigmas)
+            log_likelihoods.append(self.log_likelihood(X, tau, pi, means, sigmas))
+            #log_likelihoods.append(logL(X, tau, pi, means, sigmas))
 
         self.pi = pi
         self.means = means
         self.sigmas = sigmas
         self.log_likelihoods = log_likelihoods
 
-        return means, sigmas
+        return means, sigmas, log_likelihoods
 
     def predict(self, X_t):
         """
         Predicts the most likely class for each element in X_t
         """
-        gaussian_values = np.vstack([gaussian(X_t, self.means, self.sigmas) for j in range(self.n_classes)])
-        return np.argmin(gaussian_values, axis=1)
+        gaussian_values = np.vstack([gaussian(X_t, self.means[j], self.sigmas[j]) for j in range(self.means.shape[0])])
+        return np.argmax(gaussian_values, axis=0)
