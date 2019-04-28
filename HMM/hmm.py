@@ -1,15 +1,31 @@
 import numpy as np
 
 
-# gaussian density
-def gauss(x,mu,S):
-    rv = multivariate_normal(mu,S)
-    return rv.pdf(x)
+# Definition of the gaussian density function with non isotropic covariance matrix
+def gauss(X, mu, sigma):
+    """
+    Computes the images of the rows of X by the gaussian of mean mu and covariance S
+    """
+    if(len(X.shape) == 1):
+        X = X[np.newaxis, ...]
+    p = X.shape[1]
+    Sinv = np.linalg.pinv(sigma)
+    det = np.linalg.det(sigma)
+    const = (1.0 / np.sqrt((2 * np.pi * det) ** p))
+    return const * np.exp(-0.5 * np.einsum("ij,ij->i", (X - mu), Sinv.dot((X - mu).T).T))
 
-# gaussian density in log scaleù^m
-def gauss_log(x,mu,S):
-    rv = multivariate_normal(mu,S)
-    return rv.logpdf(x)
+# gaussian density in log scale
+def gauss_log(X, mu, sigma):
+    """
+    Gaussian density in log scale
+    """
+    if(len(X.shape) == 1):
+        X = X[np.newaxis, ...]
+    p = X.shape[1]
+    Sinv = np.linalg.pinv(sigma)
+    det = np.linalg.det(sigma)
+    return - p * np.log(np.sqrt(2 * np.pi * det)) - 0.5 * np.einsum("ij,ij->i", (X - mu), Sinv.dot((X - mu).T).T)
+
 
 
 class HMM(object):
