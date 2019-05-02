@@ -1,9 +1,13 @@
 Machine learning Models
 ======================
 This repository contains some implementations and tests of common machine learning models:
-Clustering algorithms:
+
+
+Clustering :
 ---------------------
  Kmeans, GMM and HMM
-Classification algorithms:
+ 
+ 
+Classification :
 --------------------------
  LDA, Linear Regression, Logistic regression, QDA
